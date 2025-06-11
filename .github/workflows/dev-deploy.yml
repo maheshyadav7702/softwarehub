@@ -1,0 +1,44 @@
+name: Deploy to AWS ECR
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    name: Deploy to Amazon ECR
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+
+    steps:
+    - name: Checkout source
+      uses: actions/checkout@v3
+
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v2
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ secrets.AWS_REGION }}
+
+    - name: Login to Amazon ECR
+      id: login-ecr
+      uses: aws-actions/amazon-ecr-login@v1
+
+    - name: Extract image URI
+      run: |
+        echo "REPO_URI=${{ secrets.ECR_REPOSITORY }}" >> $GITHUB_ENV
+        echo "IMAGE_TAG=$(echo $GITHUB_SHA | cut -c1-7)" >> $GITHUB_ENV
+
+    - name: Build and tag Docker image
+      run: |
+        docker build -t $REPO_URI:$IMAGE_TAG .
+        docker tag $REPO_URI:$IMAGE_TAG $REPO_URI:latest
+
+    - name: Push image to ECR
+      run: |
+        docker push $REPO_URI:$IMAGE_TAG
+        docker push $REPO_URI:latest
