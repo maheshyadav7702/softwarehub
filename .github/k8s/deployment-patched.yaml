@@ -1,4 +1,5 @@
 - name: Update K8s manifest with new image
   run: |
     mkdir -p k8s
+    if [ ! -f k8s/deployment.yaml ]; then echo "Error: k8s/deployment.yaml not found" && exit 1; fi
     sed "s|IMAGE_PLACEHOLDER|$IMAGE_URI|" k8s/deployment.yaml > k8s/deployment-patched.yaml
