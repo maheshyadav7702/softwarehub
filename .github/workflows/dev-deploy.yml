@@ -15,43 +15,45 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v3
+      - name: Checkout code
+        uses: actions/checkout@v3
 
-    - name: Configure AWS credentials
-      uses: aws-actions/configure-aws-credentials@v2
-      with:
-        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        aws-region: ${{ secrets.AWS_REGION }}
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
 
-    - name: Login to ECR
-    - name: Set image tag
-      run: |
-        echo "IMAGE_TAG=$(echo $GITHUB_SHA | cut -c1-7)" >> $GITHUB_ENV
-        echo "IMAGE_URI=$ECR_REGISTRY/$ECR_REPO:$IMAGE_TAG" >> $GITHUB_ENV
-        echo "IMAGE_TAG=$(echo $GITHUB_SHA | cut -c1-7)" >> $GITHUB_ENV
-        echo "IMAGE_URI=$ECR_REPO:$IMAGE_TAG" >> $GITHUB_ENV
+      - name: Login to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v2
 
-    - name: Build and Push Docker image
-      run: |
-        docker build -t $IMAGE_URI .
-        docker push $IMAGE_URI
+      - name: Set image tag and URI
+        run: |
+          IMAGE_TAG=$(echo $GITHUB_SHA | cut -c1-7)
+          IMAGE_URI=${ECR_REGISTRY}/${ECR_REPO}:${IMAGE_TAG}
+          echo "IMAGE_TAG=$IMAGE_TAG" >> $GITHUB_ENV
+          echo "IMAGE_URI=$IMAGE_URI" >> $GITHUB_ENV
 
-    - name: Update K8s manifest with new image
-      run: |
-        sed "s|IMAGE_PLACEHOLDER|$IMAGE_URI|" k8s/deployment.yaml > k8s/deployment-patched.yaml
+      - name: Build and Push Docker image
+        run: |
+          docker build -t $IMAGE_URI .
+          docker push $IMAGE_URI
 
-    - name: Setup kubectl
-      uses: azure/setup-kubectl@v3
-      with:
-        version: 'latest'
+      - name: Update K8s manifest with new image
+        run: |
+          sed "s|IMAGE_PLACEHOLDER|$IMAGE_URI|" k8s/deployment.yaml > k8s/deployment-patched.yaml
 
-    - name: Setup kubeconfig
-      run: |
-        aws eks update-kubeconfig --region $AWS_REGION --name ${{ secrets.EKS_CLUSTER_NAME }}
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: 'latest'
 
-    - name: Apply K8s manifests
-      run: |
-        kubectl apply -f k8s/deployment-patched.yaml
-        kubectl apply -f k8s/service.yaml
+      - name: Setup kubeconfig
+        run: |
+          aws eks update-kubeconfig --region $AWS_REGION --name ${{ secrets.EKS_CLUSTER_NAME }}
+
+      - name: Apply K8s manifests
+        run: |
+          kubectl apply -f k8s/deployment-patched.yaml
+          kubectl apply -f k8s/service.yaml
