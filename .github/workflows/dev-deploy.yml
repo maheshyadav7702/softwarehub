@@ -6,7 +6,9 @@ on:
 
 env:
   AWS_REGION: ${{ secrets.AWS_REGION }}
+  AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
   ECR_REPO: ${{ secrets.ECR_REPOSITORY }}
+  ECR_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com
 
 jobs:
   deploy:
@@ -24,10 +26,10 @@ jobs:
         aws-region: ${{ secrets.AWS_REGION }}
 
     - name: Login to ECR
-      uses: aws-actions/amazon-ecr-login@v1
-
     - name: Set image tag
       run: |
+        echo "IMAGE_TAG=$(echo $GITHUB_SHA | cut -c1-7)" >> $GITHUB_ENV
+        echo "IMAGE_URI=$ECR_REGISTRY/$ECR_REPO:$IMAGE_TAG" >> $GITHUB_ENV
         echo "IMAGE_TAG=$(echo $GITHUB_SHA | cut -c1-7)" >> $GITHUB_ENV
         echo "IMAGE_URI=$ECR_REPO:$IMAGE_TAG" >> $GITHUB_ENV
 
