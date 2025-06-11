@@ -12,3 +12,5 @@ spec:
     - protocol: TCP
       port: 80         # Public-facing port
       targetPort: 3000 # Port your Next.js app listens on
+
+      

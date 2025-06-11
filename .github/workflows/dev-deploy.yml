@@ -25,6 +25,11 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
 
+      - name: Ensure ECR repository exists
+        run: |
+          aws ecr describe-repositories --repository-names $ECR_REPO || \
+          aws ecr create-repository --repository-name $ECR_REPO
+
       - name: Login to Amazon ECR
         uses: aws-actions/amazon-ecr-login@v2
 
@@ -40,8 +45,9 @@ jobs:
           docker build -t $IMAGE_URI .
           docker push $IMAGE_URI
 
-      - name: Update K8s manifest with new image
+      - name: Patch deployment.yaml with image URI
         run: |
+          mkdir -p k8s
           sed "s|IMAGE_PLACEHOLDER|$IMAGE_URI|" k8s/deployment.yaml > k8s/deployment-patched.yaml
 
       - name: Setup kubectl
@@ -49,11 +55,11 @@ jobs:
         with:
           version: 'latest'
 
-      - name: Setup kubeconfig
+      - name: Setup kubeconfig for EKS
         run: |
           aws eks update-kubeconfig --region $AWS_REGION --name ${{ secrets.EKS_CLUSTER_NAME }}
 
-      - name: Apply K8s manifests
+      - name: Apply Kubernetes manifests
         run: |
           kubectl apply -f k8s/deployment-patched.yaml
           kubectl apply -f k8s/service.yaml
