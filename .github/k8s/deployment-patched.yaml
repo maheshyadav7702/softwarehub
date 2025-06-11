@@ -1,0 +1,4 @@
+- name: Update K8s manifest with new image
+  run: |
+    mkdir -p k8s
+    sed "s|IMAGE_PLACEHOLDER|$IMAGE_URI|" k8s/deployment.yaml > k8s/deployment-patched.yaml
