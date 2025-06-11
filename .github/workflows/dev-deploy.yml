@@ -1,20 +1,19 @@
-name: Deploy to AWS ECR
+name: Build & Deploy to EKS
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
+
+env:
+  AWS_REGION: ${{ secrets.AWS_REGION }}
+  ECR_REPO: ${{ secrets.ECR_REPOSITORY }}
 
 jobs:
   deploy:
-    name: Deploy to Amazon ECR
     runs-on: ubuntu-latest
 
-    permissions:
-      contents: read
-
     steps:
-    - name: Checkout source
+    - name: Checkout code
       uses: actions/checkout@v3
 
     - name: Configure AWS credentials
@@ -24,21 +23,33 @@ jobs:
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         aws-region: ${{ secrets.AWS_REGION }}
 
-    - name: Login to Amazon ECR
-      id: login-ecr
+    - name: Login to ECR
       uses: aws-actions/amazon-ecr-login@v1
 
-    - name: Extract image URI
+    - name: Set image tag
       run: |
-        echo "REPO_URI=${{ secrets.ECR_REPOSITORY }}" >> $GITHUB_ENV
         echo "IMAGE_TAG=$(echo $GITHUB_SHA | cut -c1-7)" >> $GITHUB_ENV
+        echo "IMAGE_URI=$ECR_REPO:$IMAGE_TAG" >> $GITHUB_ENV
 
-    - name: Build and tag Docker image
+    - name: Build and Push Docker image
       run: |
-        docker build -t $REPO_URI:$IMAGE_TAG .
-        docker tag $REPO_URI:$IMAGE_TAG $REPO_URI:latest
+        docker build -t $IMAGE_URI .
+        docker push $IMAGE_URI
 
-    - name: Push image to ECR
+    - name: Update K8s manifest with new image
       run: |
-        docker push $REPO_URI:$IMAGE_TAG
-        docker push $REPO_URI:latest
+        sed "s|IMAGE_PLACEHOLDER|$IMAGE_URI|" k8s/deployment.yaml > k8s/deployment-patched.yaml
+
+    - name: Setup kubectl
+      uses: azure/setup-kubectl@v3
+      with:
+        version: 'latest'
+
+    - name: Setup kubeconfig
+      run: |
+        aws eks update-kubeconfig --region $AWS_REGION --name ${{ secrets.EKS_CLUSTER_NAME }}
+
+    - name: Apply K8s manifests
+      run: |
+        kubectl apply -f k8s/deployment-patched.yaml
+        kubectl apply -f k8s/service.yaml
