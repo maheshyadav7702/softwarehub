@@ -14,8 +14,7 @@ RUN npm run build
 # Production image
 FROM node:20-alpine AS runner
 WORKDIR /app
-ARG NODE_ENV
-ENV NODE_ENV=$NODE_ENV
+ENV NODE_ENV production
 
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next ./.next
