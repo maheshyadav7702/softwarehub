@@ -4,6 +4,7 @@ WORKDIR /app
 
 # Install dependencies only when needed
 COPY package*.json ./
+COPY next.config.js ./
 RUN npm install --production=false
 
 # Copy the rest of the application code
