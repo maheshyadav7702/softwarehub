@@ -4,10 +4,9 @@ WORKDIR /app
 
 # Install dependencies only when needed
 COPY package*.json ./
-COPY next.config.js ./
 RUN npm install --production=false
 
-# Copy the rest of the application code
+# Copy the rest of the application code (including next.config.js)
 COPY . .
 
 RUN npm run build
@@ -21,7 +20,7 @@ COPY --from=builder /app/package*.json ./
 COPY --from=builder /app/.next ./.next
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/next.config.js ./next.config.js
+COPY --from=builder /app/next.config.ts ./next.config.ts
 
 EXPOSE 3000
 CMD ["npm", "start"]
