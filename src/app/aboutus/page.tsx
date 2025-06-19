@@ -17,5 +17,4 @@ const AboutUsPage = () => (
         </p>
     </main>
 );
-
 export default AboutUsPage;
