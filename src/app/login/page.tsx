@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
     Box,
     Button,
@@ -14,45 +14,75 @@ import {
 const validateEmail = (email: string) =>
     /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 
+type FormType = 'login' | 'signup' | 'forgot';
+type Errors = { email?: string; password?: string; confirmPassword?: string };
+
+const getValidationErrors = (
+    formType: FormType,
+    email: string,
+    password: string,
+    confirmPassword: string
+): Errors => {
+    const errors: Errors = {};
+    if (!validateEmail(email)) errors.email = 'Invalid email address';
+    if (formType !== 'forgot' && password.length < 6)
+        errors.password = 'Password must be at least 6 characters';
+    if (formType === 'signup' && password !== confirmPassword)
+        errors.confirmPassword = 'Passwords do not match';
+    return errors;
+};
+
 export default function LoginPage() {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
-    const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
-    const [formType, setFormType] = useState<'login' | 'signup' | 'forgot'>('login');
+    const [confirmPassword, setConfirmPassword] = useState('');
+    const [errors, setErrors] = useState<Errors>({});
+    const [formType, setFormType] = useState<FormType>('login');
 
-    const handleSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-        let newErrors: typeof errors = {};
+    const resetForm = useCallback(() => {
+        setEmail('');
+        setPassword('');
+        setConfirmPassword('');
+        setErrors({});
+    }, []);
 
-        if (!validateEmail(email)) {
-            newErrors.email = 'Invalid email address';
-        }
-        if (formType !== 'forgot' && password.length < 6) {
-            newErrors.password = 'Password must be at least 6 characters';
-        }
+    const handleFormTypeChange = useCallback((type: FormType) => {
+        setFormType(type);
+        resetForm();
+    }, [resetForm]);
 
-        setErrors(newErrors);
+    const handleSubmit = useCallback(
+        (e: React.FormEvent) => {
+            e.preventDefault();
+            const validationErrors = getValidationErrors(
+                formType,
+                email,
+                password,
+                confirmPassword
+            );
+            setErrors(validationErrors);
 
-        if (Object.keys(newErrors).length === 0) {
-            // Handle login, signup, or forgot password logic here
-            alert(`${formType} successful!`);
-        }
-    };
+            if (Object.keys(validationErrors).length === 0) {
+                // TODO: Implement authentication logic here
+                // Example: show success message, redirect, etc.
+            }
+        },
+        [formType, email, password, confirmPassword]
+    );
 
     return (
-      <Box
-    component={Paper}
-    elevation={6} // Increased elevation for more shadow
-    sx={{
-        maxWidth: 400,
-        height: 'auto',
-        mx: 'auto',
-        mt: 6,
-        p: 3,
-        borderRadius: 2,
-        marginBottom: 4,
-    }}
->
+        <Box
+            component={Paper}
+            elevation={6}
+            sx={{
+                maxWidth: 400,
+                mx: 'auto',
+                mt: 6,
+                p: 3,
+                borderRadius: 2,
+                mb: 4,
+            }}
+        >
             <Typography variant="h5" align="center" gutterBottom>
                 {formType === 'login' && 'Login'}
                 {formType === 'signup' && 'Sign Up'}
@@ -84,6 +114,19 @@ export default function LoginPage() {
                             autoComplete={formType === 'signup' ? 'new-password' : 'current-password'}
                         />
                     )}
+                    {formType === 'signup' && (
+                        <TextField
+                            label="Confirm Password"
+                            type="password"
+                            value={confirmPassword}
+                            onChange={e => setConfirmPassword(e.target.value)}
+                            fullWidth
+                            required
+                            error={!!errors.confirmPassword}
+                            helperText={errors.confirmPassword}
+                            autoComplete="new-password"
+                        />
+                    )}
                     <Button
                         type="submit"
                         variant="contained"
@@ -100,11 +143,11 @@ export default function LoginPage() {
                 {formType === 'login' && (
                     <>
                         <Typography variant="body2">
-                            Don't have an account?{' '}
+                            Don&#39;t have an account?{' '}
                             <Link
                                 component="button"
                                 type="button"
-                                onClick={() => { setFormType('signup'); setErrors({}); }}
+                                onClick={() => handleFormTypeChange('signup')}
                                 underline="none"
                             >
                                 Sign Up
@@ -114,7 +157,7 @@ export default function LoginPage() {
                             <Link
                                 component="button"
                                 type="button"
-                                onClick={() => { setFormType('forgot'); setErrors({}); }}
+                                onClick={() => handleFormTypeChange('forgot')}
                                 underline="none"
                             >
                                 Forgot Password?
@@ -128,7 +171,7 @@ export default function LoginPage() {
                         <Link
                             component="button"
                             type="button"
-                            onClick={() => { setFormType('login'); setErrors({}); }}
+                            onClick={() => handleFormTypeChange('login')}
                             underline="none"
                         >
                             Login
@@ -141,7 +184,7 @@ export default function LoginPage() {
                         <Link
                             component="button"
                             type="button"
-                            onClick={() => { setFormType('login'); setErrors({}); }}
+                            onClick={() => handleFormTypeChange('login')}
                             underline="none"
                         >
                             Login
