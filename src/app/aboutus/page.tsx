@@ -24,4 +24,5 @@ const AboutUsPage = () => (
     </Container>
 );
 
+
 export default AboutUsPage;
