@@ -36,6 +36,9 @@ jobs:
         run: |
           aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | docker login --username AWS --password-stdin ${{ secrets.ECR_REGISTRY }}
           docker pull ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:latest
+          # Stop and remove any container using port 80
+          docker ps -q --filter "publish=80" | xargs -r docker stop
+          docker ps -aq --filter "publish=80" | xargs -r docker rm
           docker stop app || true
           docker rm app || true
           docker run -d --name app -p 80:3000 ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:latest
