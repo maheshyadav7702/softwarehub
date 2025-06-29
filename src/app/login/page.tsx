@@ -104,12 +104,11 @@ const LoginPage = ()=> {
                             setApiError('Reset link sent to your email.');
                         }
                     }
-                } catch (err: any) {
+                } catch (err: unknown) {
                     setApiError(
-                        err?.response?.data?.message ||
-                        err?.response?.data?.error ||
                         'Something went wrong'
                     );
+                    console.error(err);
                 } finally {
                     setLoading(false);
                 }
