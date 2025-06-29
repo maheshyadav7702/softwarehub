@@ -34,7 +34,7 @@ const getValidationErrors = (
     return errors;
 };
 
-export default function LoginPage() {
+const LoginPage = ()=> {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
@@ -253,3 +253,4 @@ export default function LoginPage() {
         </Box>
     );
 }
+export default LoginPage;
