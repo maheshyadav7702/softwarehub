@@ -10,6 +10,8 @@ import {
     Link,
     Stack
 } from '@mui/material';
+import axios from 'axios';
+import { useRouter } from 'next/navigation';
 
 const validateEmail = (email: string) =>
     /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
@@ -38,12 +40,17 @@ export default function LoginPage() {
     const [confirmPassword, setConfirmPassword] = useState('');
     const [errors, setErrors] = useState<Errors>({});
     const [formType, setFormType] = useState<FormType>('login');
+    const [loading, setLoading] = useState(false);
+    const [apiError, setApiError] = useState<string | null>(null);
+
+    const router = useRouter();
 
     const resetForm = useCallback(() => {
         setEmail('');
         setPassword('');
         setConfirmPassword('');
         setErrors({});
+        setApiError(null);
     }, []);
 
     const handleFormTypeChange = useCallback((type: FormType) => {
@@ -52,8 +59,9 @@ export default function LoginPage() {
     }, [resetForm]);
 
     const handleSubmit = useCallback(
-        (e: React.FormEvent) => {
+        async (e: React.FormEvent) => {
             e.preventDefault();
+            setApiError(null);
             const validationErrors = getValidationErrors(
                 formType,
                 email,
@@ -63,11 +71,51 @@ export default function LoginPage() {
             setErrors(validationErrors);
 
             if (Object.keys(validationErrors).length === 0) {
-                // TODO: Implement authentication logic here
-                // Example: show success message, redirect, etc.
+                setLoading(true);
+                try {
+                    if (formType === 'signup') {
+                        // Signup API
+                        const res = await axios.post(
+                            `${process.env.NEXT_PUBLIC_API_URL}/user/signup`,
+                            { email, password, confirmPassword }
+                        );
+                        if (res) {
+                            // Optionally, auto-login or show success message
+                            setFormType('login');
+                            setApiError('Signup successful! Please login.');
+                        }
+                    } else if (formType === 'login') {
+                        // Login API
+                        const res = await axios.post(
+                            `${process.env.NEXT_PUBLIC_API_URL}/user/login`,
+                            { email, password }
+                        );
+                        if (res) {
+                            // Save token if needed: localStorage.setItem('token', res.data.token)
+                            router.push('/');
+                        }
+                    } else if (formType === 'forgot') {
+                        // Forgot password API
+                        const res = await axios.post(
+                            `${process.env.NEXT_PUBLIC_API_URL}/user/forgot-password`,
+                            { email }
+                        );
+                        if (res.status === 200) {
+                            setApiError('Reset link sent to your email.');
+                        }
+                    }
+                } catch (err: any) {
+                    setApiError(
+                        err?.response?.data?.message ||
+                        err?.response?.data?.error ||
+                        'Something went wrong'
+                    );
+                } finally {
+                    setLoading(false);
+                }
             }
         },
-        [formType, email, password, confirmPassword]
+        [formType, email, password, confirmPassword, router]
     );
 
     return (
@@ -127,15 +175,25 @@ export default function LoginPage() {
                             autoComplete="new-password"
                         />
                     )}
+                    {apiError && (
+                        <Typography color={apiError.includes('successful') ? 'success.main' : 'error.main'} variant="body2">
+                            {apiError}
+                        </Typography>
+                    )}
                     <Button
                         type="submit"
                         variant="contained"
                         fullWidth
                         sx={{ py: 1.5 }}
+                        disabled={loading}
                     >
-                        {formType === 'login' && 'Login'}
-                        {formType === 'signup' && 'Sign Up'}
-                        {formType === 'forgot' && 'Send Reset Link'}
+                        {loading
+                            ? 'Please wait...'
+                            : formType === 'login'
+                                ? 'Login'
+                                : formType === 'signup'
+                                    ? 'Sign Up'
+                                    : 'Send Reset Link'}
                     </Button>
                 </Stack>
             </Box>
