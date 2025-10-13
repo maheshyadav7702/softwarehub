@@ -1,4 +1,4 @@
-name: Deploy to EC2 with Docker & ECR (Self-hosted)
+name: Build & Push Docker Image to ECR
 
 on:
   push:
@@ -6,7 +6,7 @@ on:
       - main
 
 jobs:
-  deploy:
+  push-to-ecr:
     runs-on: self-hosted
 
     steps:
@@ -31,30 +31,3 @@ jobs:
       - name: Push Docker image to ECR
         run: |
           docker push ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:latest
-
-      - name: Deploy Docker container
-        run: |
-          aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | docker login --username AWS --password-stdin ${{ secrets.ECR_REGISTRY }}
-          docker pull ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:latest
-          # Stop and remove any container using port 80
-          docker ps -q --filter "publish=80" | xargs -r docker stop
-          docker ps -aq --filter "publish=80" | xargs -r docker rm
-          docker stop app || true
-          docker rm app || true
-          docker run -d --name app -p 80:3000 ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:latest
-      
-      # - name: Fill in the new image ID in the Amazon ECS task definition
-      #   id: task-def
-      #   uses: aws-actions/amazon-ecs-render-task-definition@v1
-      #   with:
-      #     task-definition: ${{ secrets.ECS_TASK_DEFINITION }}
-      #     container-name: ${{ secrets.CONTAINER_NAME }}
-      #     image: ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:latest
-
-      # - name: Deploy Amazon ECS task definition
-      #   uses: aws-actions/amazon-ecs-deploy-task-definition@v1
-      #   with:
-      #     task-definition: ${{ secrets.ECS_TASK_DEFINITION }}
-      #     service: ${{ secrets.ECS_SERVICE }}
-      #     cluster: ${{ secrets.ECS_CLUSTER }}
-      #     wait-for-service-stability: true
