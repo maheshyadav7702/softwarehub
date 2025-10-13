@@ -252,4 +252,4 @@ const LoginPage = ()=> {
         </Box>
     );
 }
-export default LoginPage;
+export default LoginPage
