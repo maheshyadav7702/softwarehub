@@ -27,9 +27,9 @@ jobs:
         run: |
           docker build -t ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:latest .
 
-      - name: Push Docker image to ECR
-        run: |
-          docker push ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:latest
+      # - name: Push Docker image to ECR
+      #   run: |
+      #     docker push ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:latest
 
       - name: Run Docker image from ECR
         run: |
