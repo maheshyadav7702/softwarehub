@@ -35,7 +35,7 @@ jobs:
         run: |
           docker rm -f softwarehub || true
 
-      - name: Remove existing Docker image (if exist)
+      - name: Remove existing Docker image (if exists)
         run: |
           docker rmi ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:latest || true
 
