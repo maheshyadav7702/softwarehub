@@ -30,3 +30,26 @@ jobs:
       - name: Push Docker image to ECR
         run: |
           docker push ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:latest
+
+      - name: Run Docker image from ECR
+        run: |
+          # Remove existing container if it exists
+          docker rm -f maheshit-app || true
+
+          # Remove existing image if it exists
+          docker rmi -f ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:$(cat image_tag.txt) || true
+
+          # Generate a unique tag using GitHub run number
+          IMAGE_TAG=${{ github.run_number }}
+
+          # Build and tag the image with the serial number
+          docker build -t ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:$IMAGE_TAG .
+
+          # Push the image with the serial number tag
+          docker push ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:$IMAGE_TAG
+
+          # Pull the latest image with the serial number tag
+          docker pull ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:$IMAGE_TAG
+
+          # Run the new container
+          docker run -d --name softwarehub-app -p 80:3000 ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:$IMAGE_TAG
