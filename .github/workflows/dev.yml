@@ -33,7 +33,7 @@ jobs:
 
       - name: Remove existing Docker container (if running)
         run: |
-          docker rm -f softwarehub || true
+          docker rm -f mahesh-it-app || true
 
       - name: Remove existing Docker image (if exists)
         run: |
@@ -41,4 +41,4 @@ jobs:
 
       - name: Run latest Docker image
         run: |
-          docker run -d --name softwarehub -p 80:3000 ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:latest
+          docker run -d --name mahesh-it-app -p 80:3000 ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:latest
