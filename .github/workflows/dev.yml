@@ -21,17 +21,22 @@ jobs:
           aws-region: ${{ secrets.AWS_REGION }}
 
       - name: Login to Amazon ECR
+        id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
         with: 
           mask-password: 'true'
 
+      - name: Set image tag
+        id: vars
+        run: echo "tag=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+
       - name: Build Docker image
         run: |
-          docker build -t ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:latest .
+          docker build -t ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:${{ steps.vars.outputs.tag }} .
 
       - name: Push Docker image to ECR
         run: |
-          docker push ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:latest
+          docker push ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:${{ steps.vars.outputs.tag }}
 
       - name: Remove existing Docker container (if running)
         run: |
@@ -39,8 +44,8 @@ jobs:
 
       - name: Remove existing Docker image (if exists)
         run: |
-          docker rmi ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:latest || true
+          docker rmi ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:${{ steps.vars.outputs.tag }} || true
 
       - name: Run latest Docker image
         run: |
-          docker run -d --name mahesh-it-app -p 80:3000 ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:latest
+          docker run -d --name mahesh-it-app -p 80:3000 ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:${{ steps.vars.outputs.tag }}
