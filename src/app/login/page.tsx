@@ -244,7 +244,7 @@ const LoginPage = ()=> {
                             onClick={() => handleFormTypeChange('login')}
                             underline="none"
                         >
-                            Login
+                            Login page
                         </Link>
                     </Typography>
                 )}
