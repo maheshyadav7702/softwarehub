@@ -1,63 +1,43 @@
-name: Deploy to AWS ECR and run Docker image
+name: Build and Push to Amazon ECR
 
 on:
   push:
     branches:
       - main
 
-concurrency:
-  group: deploy-ecr-${{ github.ref_name }}
-  cancel-in-progress: true
-
 jobs:
-  push-to-ecr:
-    runs-on: self-hosted
-
-    env:
-      ECR_REGISTRY: ${{ secrets.ECR_REGISTRY }}
-      ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY }}
-      IMAGE_NAME: ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}
-      CONTAINER_NAME: mahesh-it-app
-      CONTAINER_PORT: 80
-      HOST_PORT: 3000
+  build-and-push:
+    runs-on: ubuntu-latest
 
     steps:
+      # 🧩 Step 1: Checkout the source code
       - name: Checkout code
         uses: actions/checkout@v4
 
+      # 🔐 Step 2: Configure AWS credentials from GitHub Secrets
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ap-south-1   # <-- Change this to your AWS region
+
+      # 🔑 Step 3: Log in to Amazon ECR
       - name: Login to Amazon ECR
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
+        with:
+          region: ap-south-1       # <-- Must match your ECR region
 
-      - name: Set image tag and metadata
-        id: vars
+      # 🐳 Step 4: Build, tag, and push image to ECR
+      - name: Build, tag, and push image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: mahesh-it-app   # <-- Your ECR repo name
+          IMAGE_TAG: ${{ github.sha }}
         run: |
-          TAG=$(git rev-parse --short HEAD)
-          echo "IMAGE_TAG=${TAG}" >> $GITHUB_ENV
-          echo "IMAGE_REF=${IMAGE_NAME}:${TAG}" >> $GITHUB_ENV
-
-      - name: Build Docker image
-        run: |
-          docker build --pull -t "${IMAGE_REF}" .
-
-      - name: Push Docker image to ECR
-        run: |
-          docker push "${IMAGE_REF}"
-
-      - name: Stop and remove existing container (if running)
-        run: |
-          if docker ps -a --format '{{.Names}}' | grep -q "^${CONTAINER_NAME}$"; then
-            docker rm -f "${CONTAINER_NAME}"
-          fi || true
-
-      - name: Remove local image (optional cleanup)
-        run: |
-          docker rmi "${IMAGE_REF}" || true
-
-      - name: Run latest Docker image
-        run: |
-          docker run -d \
-            --name "${CONTAINER_NAME}" \
-            --restart unless-stopped \
-            -p ${HOST_PORT}:${CONTAINER_PORT} \
-            "${IMAGE_REF}"
+          echo "Building Docker image..."
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+          echo "Pushing image to ECR..."
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          echo "Image successfully pushed: $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
