@@ -1,13 +1,25 @@
-name: Deploy to AWS ECR and push Docker image
+name: Deploy to AWS ECR and run Docker image
 
 on:
   push:
     branches:
       - main
 
+concurrency:
+  group: deploy-ecr-${{ github.ref_name }}
+  cancel-in-progress: true
+
 jobs:
   push-to-ecr:
     runs-on: self-hosted
+
+    env:
+      ECR_REGISTRY: ${{ secrets.ECR_REGISTRY }}
+      ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY }}
+      IMAGE_NAME: ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}
+      CONTAINER_NAME: mahesh-it-app
+      CONTAINER_PORT: 80
+      HOST_PORT: 3000
 
     steps:
       - name: Checkout code
@@ -23,45 +35,36 @@ jobs:
       - name: Login to Amazon ECR
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
-        with: 
-          mask-password: 'true'
 
-      - name: Set image tag
+      - name: Set image tag and metadata
         id: vars
-        run: echo "tag=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+        run: |
+          TAG=$(git rev-parse --short HEAD)
+          echo "IMAGE_TAG=${TAG}" >> $GITHUB_ENV
+          echo "IMAGE_REF=${IMAGE_NAME}:${TAG}" >> $GITHUB_ENV
 
       - name: Build Docker image
         run: |
-          docker build -t ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:${{ steps.vars.outputs.tag }} .
+          docker build --pull -t "${IMAGE_REF}" .
 
       - name: Push Docker image to ECR
         run: |
-          docker push ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:${{ steps.vars.outputs.tag }}
+          docker push "${IMAGE_REF}"
 
-      - name: Remove existing Docker container (if running)
+      - name: Stop and remove existing container (if running)
         run: |
-          docker rm -f mahesh-it-app || true
+          if docker ps -a --format '{{.Names}}' | grep -q "^${CONTAINER_NAME}$"; then
+            docker rm -f "${CONTAINER_NAME}"
+          fi || true
 
-      - name: Remove existing Docker image (if exists)
+      - name: Remove local image (optional cleanup)
         run: |
-          docker rmi ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:${{ steps.vars.outputs.tag }} || true
+          docker rmi "${IMAGE_REF}" || true
 
       - name: Run latest Docker image
         run: |
-          docker run -d --name mahesh-it-app -p 3000:80 ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:${{ steps.vars.outputs.tag }}
-  
-      # - name: fill in the new image ID Amazon ECS task definition
-      #   id: task-def
-      #   uses: aws-actions/amazon-ecs-render-task-definition@v1
-      #   with:
-      #     task-definition: mahesh-it-app-task-definition.json
-      #     container-name: mahesh-it-app
-      #     image: ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:${{ steps.vars.outputs.tag }}
-      # - name: Deploy Amazon ECS task definition
-      #   uses: aws-actions/amazon-ecs-deploy-task-definition@v1
-      #   with:
-      #     task-definition: ${{ steps.task-def.outputs.task-definition }}
-      #     service: mahesh-it-app-service
-      #     cluster: mahesh-it-app-cluster
-      #     wait-for-service-stability: true
-
+          docker run -d \
+            --name "${CONTAINER_NAME}" \
+            --restart unless-stopped \
+            -p ${HOST_PORT}:${CONTAINER_PORT} \
+            "${IMAGE_REF}"
