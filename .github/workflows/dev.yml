@@ -48,7 +48,7 @@ jobs:
 
       - name: Run latest Docker image
         run: |
-          docker run -d --name mahesh-it-app -p 80:3000 ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:${{ steps.vars.outputs.tag }}
+          docker run -d --name mahesh-it-app -p 3000:80 ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:${{ steps.vars.outputs.tag }}
   
       # - name: fill in the new image ID Amazon ECS task definition
       #   id: task-def
