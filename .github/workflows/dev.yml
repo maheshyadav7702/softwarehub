@@ -34,7 +34,7 @@ jobs:
       - name: Run Docker image from ECR
         run: |
           # Remove existing container if it exists
-          docker rm -f maheshit-app || true
+          docker rm -f mahesh-it-app || true
 
           # Remove existing image if it exists
           docker rmi -f ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:$(cat image_tag.txt) || true
