@@ -1,4 +1,4 @@
-name: Build and Push to Amazon ECR
+name: Deploy to AWS ECR and push Docker image
 
 on:
   push:
@@ -6,49 +6,50 @@ on:
       - main
 
 jobs:
-  build-and-push:
-    runs-on: ubuntu-latest
+  push-to-ecr:
+    runs-on: self-hosted
 
     steps:
-      # 🧩 Step 1: Checkout the source code
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # 🔐 Step 2: Configure AWS credentials from GitHub Secrets
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ap-south-1   # <-- Change this to your AWS region
+          aws-region: ${{ secrets.AWS_REGION }}
 
-      # 🔑 Step 3: Log in to Amazon ECR
       - name: Login to Amazon ECR
-        id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
-        with:
-          region: ap-south-1       # <-- Must match your ECR region
 
-      # 🐳 Step 4: Build, tag, push and run the container
-
-      - name: Build, tag, push, and run the Docker image
-        env:
-          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          ECR_REPOSITORY: mahesh-it-app   # <-- Change this to your ECR repository name
-          IMAGE_TAG: latest
+      - name: Build Docker image
         run: |
-          # Build the Docker image
-          docker build -t $ECR_REPOSITORY:$IMAGE_TAG .
+          docker build -t ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:latest .
 
-          # Tag the image with the ECR registry
-          docker tag $ECR_REPOSITORY:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+      # - name: Push Docker image to ECR
+      #   run: |
+      #     docker push ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:latest
 
-          # Push the image to Amazon ECR
-          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+      - name: Run Docker image from ECR
+        run: |
+          # Remove existing container if it exists
+          docker rm -f maheshit-app || true
 
-          # (Optional) Run the Docker image locally for testing
-          docker run -d -p 80:3000 $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          # Remove existing image if it exists
+          docker rmi -f ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:$(cat image_tag.txt) || true
 
+          # Generate a unique tag using GitHub run number
+          IMAGE_TAG=${{ github.run_number }}
 
-       
-          
+          # Build and tag the image with the serial number
+          docker build -t ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:$IMAGE_TAG .
+
+          # Push the image with the serial number tag
+          docker push ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:$IMAGE_TAG
+
+          # Pull the latest image with the serial number tag
+          docker pull ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:$IMAGE_TAG
+
+          # Run the new container
+          docker run -d --name mahesh-it-app -p 3000:80 ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:$IMAGE_TAG
