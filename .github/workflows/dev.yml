@@ -1,21 +1,23 @@
-name: Deploy to AWS ECR and EC2
-
+name: Deploy to AWS ECR and run Docker image
 on:
   push:
     branches:
       - main
 
-env:
-  CONTAINER_NAME: mahesh-it-app
-  PORT_MAPPING: "80:3000"  # change based on your app’s internal port
-  REGION: ${{ secrets.AWS_REGION }}
+concurrency:
+  group: deploy-ecr-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  build-and-deploy:
-    runs-on: ubuntu-latest
+  push-to-ecr:
+    runs-on: self-hosted
+    env:
+      ECR_REGISTRY: ${{ secrets.ECR_REGISTRY }}
+      ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY }}
+      AWS_REGION: ${{ secrets.AWS_REGION }}
 
     steps:
-      - name: Checkout repository
+      - name: Checkout code
         uses: actions/checkout@v4
 
       - name: Configure AWS credentials
@@ -23,57 +25,35 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.REGION }}
+          aws-region: ${{ env.AWS_REGION }}
 
       - name: Login to Amazon ECR
-        id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Set image tags
+      - name: Set image tag
         id: vars
         run: |
-          SHA_TAG=$(git rev-parse --short HEAD)
-          echo "sha_tag=$SHA_TAG" >> $GITHUB_OUTPUT
-          echo "latest_tag=latest" >> $GITHUB_OUTPUT
+          # use short sha + timestamp to avoid collisions and improve traceability
+          sha=$(git rev-parse --short HEAD 2>/dev/null || echo unknown)
+          echo "tag=${sha}-$(date -u +%Y%m%d%H%M%S)" >> $GITHUB_OUTPUT
 
-      - name: Build Docker image
-        run: |
-          IMAGE=${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}
-          docker build -t $IMAGE:${{ steps.vars.outputs.sha_tag }} .
-          docker tag $IMAGE:${{ steps.vars.outputs.sha_tag }} $IMAGE:latest
-
-      - name: Push Docker image to ECR
-        run: |
-          IMAGE=${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}
-          docker push $IMAGE:${{ steps.vars.outputs.sha_tag }}
-          docker push $IMAGE:latest
-
-      - name: Deploy on EC2 via SSH
-        uses: appleboy/ssh-action@v0.1.9
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
         with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ${{ secrets.EC2_USER }}
-          key: ${{ secrets.EC2_SSH_KEY }}
-          port: ${{ secrets.EC2_SSH_PORT || '22' }}
-          script_stop: true
-          script: |
-            set -e
+          context: .
+          push: true
+          tags: ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:${{ steps.vars.outputs.tag }}
+          cache-from: type=registry,ref=${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:cache
+          cache-to: type=inline
 
-            IMAGE=${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:${{ steps.vars.outputs.sha_tag }}
-            CONTAINER=${{ env.CONTAINER_NAME }}
+      - name: Stop & remove existing container (if running)
+        run: |
+          docker rm -f mahesh-it-app || true
 
-            echo "Logging in to ECR..."
-            aws ecr get-login-password --region ${{ env.REGION }} | docker login --username AWS --password-stdin ${{ secrets.ECR_REGISTRY }}
+      - name: Remove old image (optional)
+        run: |
+          docker rmi ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:${{ steps.vars.outputs.tag }} || true
 
-            echo "Pulling latest image..."
-            docker pull $IMAGE
-
-            echo "Stopping and removing old container if exists..."
-            docker stop $CONTAINER || true
-            docker rm $CONTAINER || true
-
-            echo "Running new container..."
-            docker run -d --name $CONTAINER -p ${{ env.PORT_MAPPING }} $IMAGE
-
-            echo "Cleanup old dangling images..."
-            docker image prune -f
+      - name: Run latest Docker image
+        run: |
+          docker run -d --name mahesh-it-app -p 80:3000 ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:${{ steps.vars.outputs.tag }}
