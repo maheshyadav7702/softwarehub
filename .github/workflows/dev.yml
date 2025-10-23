@@ -1,12 +1,15 @@
 name: Deploy to AWS ECR and run Docker image
+
 on:
   push:
-    branches:
-      - main
+    branches: [ main ]
 
 concurrency:
-  group: deploy-ecr-${{ github.ref }}
+  group: deploy-${{ github.ref }}
   cancel-in-progress: true
+
+permissions:
+  contents: read
 
 jobs:
   push-to-ecr:
@@ -14,46 +17,46 @@ jobs:
     env:
       ECR_REGISTRY: ${{ secrets.ECR_REGISTRY }}
       ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY }}
-      AWS_REGION: ${{ secrets.AWS_REGION }}
+      CONTAINER_NAME: mahesh-it-app
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.AWS_REGION }}
+          aws-region: ${{ secrets.AWS_REGION }}
 
       - name: Login to Amazon ECR
         uses: aws-actions/amazon-ecr-login@v2
+        with:
+          mask-password: true
 
       - name: Set image tag
-        id: vars
-        run: |
-          # use short sha + timestamp to avoid collisions and improve traceability
-          sha=$(git rev-parse --short HEAD 2>/dev/null || echo unknown)
-          echo "tag=${sha}-$(date -u +%Y%m%d%H%M%S)" >> $GITHUB_OUTPUT
+        id: tag
+        run: echo "tag=${GITHUB_SHA::7}" >> $GITHUB_OUTPUT
 
-      - name: Build and push Docker image
-        uses: docker/build-push-action@v5
+      - name: Build and push Docker image (with cache)
+        uses: docker/build-push-action@v4
         with:
           context: .
           push: true
-          tags: ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:${{ steps.vars.outputs.tag }}
-          cache-from: type=registry,ref=${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:cache
-          cache-to: type=inline
+          tags: ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:${{ steps.tag.outputs.tag }},${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
-      - name: Stop & remove existing container (if running)
+      - name: Stop and remove existing container (if running)
         run: |
-          docker rm -f mahesh-it-app || true
-
-      - name: Remove old image (optional)
-        run: |
-          docker rmi ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:${{ steps.vars.outputs.tag }} || true
+          if docker ps -a --format '{{.Names}}' | grep -Eq "^${CONTAINER_NAME}$"; then
+            docker rm -f "${CONTAINER_NAME}"
+          fi
 
       - name: Run latest Docker image
         run: |
-          docker run -d --name mahesh-it-app -p 80:3000 ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:${{ steps.vars.outputs.tag }}
+          docker run -d --name "${CONTAINER_NAME}" -p 80:3000 --restart unless-stopped \
+            ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:${{ steps.tag.outputs.tag }}
