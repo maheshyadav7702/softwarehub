@@ -49,11 +49,11 @@ jobs:
           docker rm -f mahesh-it-app || true 
 
       - name: Remove existing Docker image (if exists) 
-        run: | 
-          docker rmi ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:${{ steps.vars.outputs.tag }} || true 
+        run: |
+          docker rmi ${{ steps.login-ecr.outputs.registry }}/${{ secrets.ECR_REPOSITORY }}:latest || true 
       - name: Run latest Docker image 
-        run: | 
-          docker run -d --name mahesh-it-app -p 3000:80 ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:${{ steps.vars.outputs.tag }}
+        run: |
+          docker run -d --name mahesh-it-app -p 3000:80 ${{ steps.login-ecr.outputs.registry }}/${{ secrets.ECR_REPOSITORY }}:latest
           
         
       
