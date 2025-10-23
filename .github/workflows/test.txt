@@ -29,26 +29,32 @@ jobs:
         with:
           region: ap-south-1       # <-- Must match your ECR region
 
-      # 🐳 Step 4: Build, tag, push and run the container
-
-      - name: Build, tag, push, and run the Docker image
+      # 🐳 Step 4: Build, tag, and push image to ECR 
+      - name: Build, tag, and push image to ECR
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          ECR_REPOSITORY: mahesh-it-app   # <-- Change this to your ECR repository name
+          ECR_REPOSITORY: ${{secrets.ECR_REPOSITORY}}   # <-- Change this to your ECR repository name
           IMAGE_TAG: latest
         run: |
           # Build the Docker image
-          docker build -t $ECR_REPOSITORY:$IMAGE_TAG .
+          docker build -t $ECR_REPOSITORY:$IMAGE_TAG .  
 
           # Tag the image with the ECR registry
           docker tag $ECR_REPOSITORY:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
-
-          # Push the image to Amazon ECR
+          # Push the image to ECR
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+      
+      # - name: Remove existing Docker container (if running)
+      #   run: | 
+      #     docker rm -f mahesh-it-app || true 
 
-          # (Optional) Run the Docker image locally for testing
-          docker run -d -p 80:3000 $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
-
-
-       
+      # - name: Remove existing Docker image (if exists) 
+      #   run: |
+      #     docker rmi ${{ steps.login-ecr.outputs.registry }}/${{ secrets.ECR_REPOSITORY }}:latest || true 
+      - name: Run latest Docker image 
+        run: |
+          docker run -d --name mahesh-it-app -p 3000:80 ${{ steps.login-ecr.outputs.registry }}/${{ secrets.ECR_REPOSITORY }}:latest
+          
+        
+      
           
