@@ -1,4 +1,4 @@
-name: Deploy to AWS ECR and Run Container
+name: Deploy to AWS ECR and push Docker image
 
 on:
   push:
@@ -6,15 +6,11 @@ on:
       - main
 
 jobs:
-  deploy:
-    name: Build, Push, and Run Docker Container
+  push-to-ecr:
     runs-on: self-hosted
 
-    env:
-      CONTAINER_NAME: mahesh-it-app
-
     steps:
-      - name: Checkout repository
+      - name: Checkout code
         uses: actions/checkout@v4
 
       - name: Configure AWS credentials
@@ -25,46 +21,31 @@ jobs:
           aws-region: ${{ secrets.AWS_REGION }}
 
       - name: Login to Amazon ECR
-        id: ecr-login
+        id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
-        with:
-          mask-password: true
+        with: 
+          mask-password: 'true'
 
       - name: Set image tag
         id: vars
-        run: echo "TAG=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
+        run: echo "tag=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
 
       - name: Build Docker image
         run: |
-          IMAGE=${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:${TAG}
-          echo "Building image: $IMAGE"
-          docker build -t "$IMAGE" .
+          docker build -t ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:${{ steps.vars.outputs.tag }} .
 
       - name: Push Docker image to ECR
         run: |
-          IMAGE=${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:${TAG}
-          echo "Pushing image: $IMAGE"
-          docker push "$IMAGE"
+          docker push ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:${{ steps.vars.outputs.tag }}
 
-      - name: Stop and remove old container if running
+      - name: Remove existing Docker container (if running)
         run: |
-          if [ "$(docker ps -q -f name=${CONTAINER_NAME})" ]; then
-            echo "Stopping old container..."
-            docker stop ${CONTAINER_NAME} || true
-            docker rm ${CONTAINER_NAME} || true
-          fi
+          docker rm -f mahesh-it-app || true
 
-      - name: Remove old image (optional)
+      - name: Remove existing Docker image (if exists)
         run: |
-          IMAGE=${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:${TAG}
-          docker rmi "$IMAGE" || true
+          docker rmi ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:${{ steps.vars.outputs.tag }} || true
 
-      - name: Run new Docker container
+      - name: Run latest Docker image
         run: |
-          IMAGE=${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:${TAG}
-          echo "Running new container from image: $IMAGE"
-          docker run -d \
-            --name ${CONTAINER_NAME} \
-            -p 80:3000 \
-            --restart unless-stopped \
-            "$IMAGE"
+          docker run -d --name mahesh-it-app -p 3000:80 ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:${{ steps.vars.outputs.tag }}
