@@ -1,4 +1,4 @@
-name: Deploy to AWS ECR and push Docker image
+name: Deploy to AWS ECR and run on EC2
 
 on:
   push:
@@ -6,14 +6,14 @@ on:
       - main
 
 jobs:
-  push-to-ecr:
-    runs-on: self-hosted
+  build-and-deploy:
+    runs-on: ubuntu-latest
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Configure AWS credentials
+      - name: Configure AWS credentials (for pushing to ECR)
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
@@ -23,8 +23,6 @@ jobs:
       - name: Login to Amazon ECR
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
-        with: 
-          mask-password: 'true'
 
       - name: Set image tag
         id: vars
@@ -38,30 +36,19 @@ jobs:
         run: |
           docker push ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:${{ steps.vars.outputs.tag }}
 
-      - name: Remove existing Docker container (if running)
-        run: |
-          docker rm -f mahesh-it-app || true
-
-      - name: Remove existing Docker image (if exists)
-        run: |
-          docker rmi ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:${{ steps.vars.outputs.tag }} || true
-
-      - name: Run latest Docker image
-        run: |
-          docker run -d --name mahesh-it-app -p 3000:80 ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:${{ steps.vars.outputs.tag }}
-  
-      # - name: fill in the new image ID Amazon ECS task definition
-      #   id: task-def
-      #   uses: aws-actions/amazon-ecs-render-task-definition@v1
-      #   with:
-      #     task-definition: mahesh-it-app-task-definition.json
-      #     container-name: mahesh-it-app
-      #     image: ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:${{ steps.vars.outputs.tag }}
-      # - name: Deploy Amazon ECS task definition
-      #   uses: aws-actions/amazon-ecs-deploy-task-definition@v1
-      #   with:
-      #     task-definition: ${{ steps.task-def.outputs.task-definition }}
-      #     service: mahesh-it-app-service
-      #     cluster: mahesh-it-app-cluster
-      #     wait-for-service-stability: true
-
+      - name: Deploy on EC2 via SSH
+        uses: appleboy/ssh-action@v0.1.9
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          port: ${{ secrets.EC2_SSH_PORT || '22' }}
+          script: |
+            set -e
+            # if EC2 has awscli and IAM role or credentials, login to ECR:
+            aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | docker login --username AWS --password-stdin ${{ secrets.ECR_REGISTRY }}
+            IMAGE=${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:${{ steps.vars.outputs.tag }}
+            docker pull $IMAGE
+            docker rm -f mahesh-it-app || true
+            docker rmi $IMAGE || true
+            docker run -d --name mahesh-it-app -p 80:80 $IMAGE
