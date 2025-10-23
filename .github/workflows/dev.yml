@@ -44,13 +44,13 @@ jobs:
           # Push the image to ECR
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
       
-      - name: Remove existing Docker container (if running)
-        run: | 
-          docker rm -f mahesh-it-app || true 
+      # - name: Remove existing Docker container (if running)
+      #   run: | 
+      #     docker rm -f mahesh-it-app || true 
 
-      - name: Remove existing Docker image (if exists) 
-        run: |
-          docker rmi ${{ steps.login-ecr.outputs.registry }}/${{ secrets.ECR_REPOSITORY }}:latest || true 
+      # - name: Remove existing Docker image (if exists) 
+      #   run: |
+      #     docker rmi ${{ steps.login-ecr.outputs.registry }}/${{ secrets.ECR_REPOSITORY }}:latest || true 
       - name: Run latest Docker image 
         run: |
           docker run -d --name mahesh-it-app -p 3000:80 ${{ steps.login-ecr.outputs.registry }}/${{ secrets.ECR_REPOSITORY }}:latest
