@@ -33,7 +33,7 @@ jobs:
       - name: Build, tag, and push image to ECR
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          ECR_REPOSITORY: softwarehub-repo   # <-- Change this to your ECR repository name
+          ECR_REPOSITORY: ${{secrets.ECR_REPOSITORY}}   # <-- Change this to your ECR repository name
           IMAGE_TAG: latest
         run: |
           # Build the Docker image
