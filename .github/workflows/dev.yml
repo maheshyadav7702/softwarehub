@@ -29,15 +29,32 @@ jobs:
         with:
           region: ap-south-1       # <-- Must match your ECR region
 
-      # 🐳 Step 4: Build, tag, and push image to ECR
-      - name: Build, tag, and push image
+      # 🐳 Step 4: Build, tag, and push image to ECR 
+      - name: Build, tag, and push image to ECR
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          ECR_REPOSITORY: mahesh-it-app   # <-- Your ECR repo name
-          IMAGE_TAG: ${{ github.sha }}
+          ECR_REPOSITORY: softwarehub-repo   # <-- Change this to your ECR repository name
+          IMAGE_TAG: latest
         run: |
-          echo "Building Docker image..."
-          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
-          echo "Pushing image to ECR..."
+          # Build the Docker image
+          docker build -t $ECR_REPOSITORY:$IMAGE_TAG .  
+
+          # Tag the image with the ECR registry
+          docker tag $ECR_REPOSITORY:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          # Push the image to ECR
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
-          echo "Image successfully pushed: $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
+      
+      - name: Remove existing Docker container (if running)
+        run: | 
+          docker rm -f mahesh-it-app || true 
+
+      - name: Remove existing Docker image (if exists) 
+        run: | 
+          docker rmi ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:${{ steps.vars.outputs.tag }} || true 
+      - name: Run latest Docker image 
+        run: | 
+          docker run -d --name mahesh-it-app -p 3000:80 ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:${{ steps.vars.outputs.tag }}
+          
+        
+      
+          
