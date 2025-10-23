@@ -1,40 +1,52 @@
-name: Deploy to AWS ECR and run on EC2
+name: Deploy to AWS ECR and EC2
 
 on:
   push:
     branches:
       - main
 
+env:
+  CONTAINER_NAME: mahesh-it-app
+  PORT_MAPPING: "80:3000"  # change based on your app’s internal port
+  REGION: ${{ secrets.AWS_REGION }}
+
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Configure AWS credentials (for pushing to ECR)
+      - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.AWS_REGION }}
+          aws-region: ${{ env.REGION }}
 
       - name: Login to Amazon ECR
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Set image tag
+      - name: Set image tags
         id: vars
-        run: echo "tag=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+        run: |
+          SHA_TAG=$(git rev-parse --short HEAD)
+          echo "sha_tag=$SHA_TAG" >> $GITHUB_OUTPUT
+          echo "latest_tag=latest" >> $GITHUB_OUTPUT
 
       - name: Build Docker image
         run: |
-          docker build -t ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:${{ steps.vars.outputs.tag }} .
+          IMAGE=${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}
+          docker build -t $IMAGE:${{ steps.vars.outputs.sha_tag }} .
+          docker tag $IMAGE:${{ steps.vars.outputs.sha_tag }} $IMAGE:latest
 
       - name: Push Docker image to ECR
         run: |
-          docker push ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:${{ steps.vars.outputs.tag }}
+          IMAGE=${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}
+          docker push $IMAGE:${{ steps.vars.outputs.sha_tag }}
+          docker push $IMAGE:latest
 
       - name: Deploy on EC2 via SSH
         uses: appleboy/ssh-action@v0.1.9
@@ -43,12 +55,25 @@ jobs:
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
           port: ${{ secrets.EC2_SSH_PORT || '22' }}
+          script_stop: true
           script: |
             set -e
-            # if EC2 has awscli and IAM role or credentials, login to ECR:
-            aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | docker login --username AWS --password-stdin ${{ secrets.ECR_REGISTRY }}
-            IMAGE=${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:${{ steps.vars.outputs.tag }}
+
+            IMAGE=${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:${{ steps.vars.outputs.sha_tag }}
+            CONTAINER=${{ env.CONTAINER_NAME }}
+
+            echo "Logging in to ECR..."
+            aws ecr get-login-password --region ${{ env.REGION }} | docker login --username AWS --password-stdin ${{ secrets.ECR_REGISTRY }}
+
+            echo "Pulling latest image..."
             docker pull $IMAGE
-            docker rm -f mahesh-it-app || true
-            docker rmi $IMAGE || true
-            docker run -d --name mahesh-it-app -p 80:80 $IMAGE
+
+            echo "Stopping and removing old container if exists..."
+            docker stop $CONTAINER || true
+            docker rm $CONTAINER || true
+
+            echo "Running new container..."
+            docker run -d --name $CONTAINER -p ${{ env.PORT_MAPPING }} $IMAGE
+
+            echo "Cleanup old dangling images..."
+            docker image prune -f
