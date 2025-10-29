@@ -31,25 +31,25 @@ jobs:
       #   run: |
       #     docker push ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:latest
 
+      
       - name: Run Docker image from ECR
         run: |
-          # Remove existing container if it exists
-          docker rm -f mahesh-it-app || true
+          set -eux
 
-          # Remove existing image if it exists
-          docker rmi -f ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:$(cat image_tag.txt) || true
+          # ensure we're logged in (amazon-ecr-login@v2 should have done this, but keep for safety)
+          aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | docker login --username AWS --password-stdin ${{ secrets.ECR_REGISTRY }}
+
+          # cleanup existing container/image
+          docker rm -f mahesh-it-app || true
+          docker rmi -f ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:$(cat image_tag.txt 2>/dev/null || echo latest) || true
 
           # Generate a unique tag using GitHub run number
           IMAGE_TAG=${{ github.run_number }}
 
-          # Build and tag the image with the serial number
+          # Build, tag and push the image
           docker build -t ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:$IMAGE_TAG .
+          docker push ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:$IMAGE_TAG
 
-          # Push the image with the serial number tag
-          docker push ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECsR_REPOSITORY }}:$IMAGE_TAG
-
-          # Pull the latest image with the serial number tag
+          # Pull and run the new image
           docker pull ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:$IMAGE_TAG
-
-          # Run the new containers
           docker run -d --name mahesh-it-app -p 80:80 ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:$IMAGE_TAG
