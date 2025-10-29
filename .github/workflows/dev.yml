@@ -46,10 +46,10 @@ jobs:
           docker build -t ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:$IMAGE_TAG .
 
           # Push the image with the serial number tag
-          docker push ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:$IMAGE_TAG
+          docker push ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECsR_REPOSITORY }}:$IMAGE_TAG
 
           # Pull the latest image with the serial number tag
           docker pull ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:$IMAGE_TAG
 
           # Run the new containers
-          docker run -d --name mahesh-it-app -p 3000:80 ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:$IMAGE_TAG
+          docker run -d --name mahesh-it-app -p 80:80 ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:$IMAGE_TAG
