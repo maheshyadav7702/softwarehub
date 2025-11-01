@@ -33,20 +33,20 @@ jobs:
 
       - name: Run Docker image from ECR
         run: |
+          # Generate a unique tag using GitHub run number
+          IMAGE_TAG=${{ github.run_number }}
+
           # Remove existing container if it exists
           docker rm -f mahesh-it-app || true
 
           # Remove existing image if it exists
-          docker rmi -f ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:$(cat image_tag.txt) || true
-
-          # Generate a unique tag using GitHub run number
-          IMAGE_TAG=${{ github.run_number }}
+          docker rmi -f ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:$IMAGE_TAG || true
 
           # Build and tag the image with the serial number
           docker build -t ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:$IMAGE_TAG .
 
           # Push the image with the serial number tag
-          docker push ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECsR_REPOSITORY }}:$IMAGE_TAG
+          docker push ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:$IMAGE_TAG
 
           # Pull the latest image with the serial number tag
           docker pull ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:$IMAGE_TAG
