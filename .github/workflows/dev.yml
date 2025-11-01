@@ -5,12 +5,30 @@ on:
     branches:
       - main
 
+concurrency:
+  group: deploy-${{ github.repository }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
 jobs:
-  push-to-ecr:
-    runs-on: self-hosted
+  deploy:
+    name: Deploy
+    runs-on: ["self-hosted", "mahesh-it-app"]
+    defaults:
+      run:
+        shell: bash
+
+    env:
+      AWS_REGION: ${{ secrets.AWS_REGION }}
+      ECR_REGISTRY: ${{ secrets.ECR_REGISTRY }}          # e.g. 123456789012.dkr.ecr.<region>.amazonaws.com
+      ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY }}      # e.g. my-repo
+      CONTAINER_NAME: mahesh-it-app
+      IMAGE_TAG: ${{ github.run_number }}                # unique-ish tag per workflow run
 
     steps:
-      - name: Checkout code
+      - name: Checkout source code
         uses: actions/checkout@v4
 
       - name: Configure AWS credentials
@@ -18,40 +36,47 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.AWS_REGION }}
+          aws-region: ${{ env.AWS_REGION }}
 
       - name: Ensure ECR repository exists
         run: |
-          aws ecr describe-repositories --repository-names "${{ secrets.ECR_REPOSITORY }}" --region ${{ secrets.AWS_REGION }} || \
-          aws ecr create-repository --repository-name "${{ secrets.ECR_REPOSITORY }}" --region ${{ secrets.AWS_REGION }}
+          set -euo pipefail
+          if ! aws ecr describe-repositories --repository-names "${ECR_REPOSITORY}" --region "${AWS_REGION}" > /dev/null 2>&1; then
+            aws ecr create-repository --repository-name "${ECR_REPOSITORY}" --region "${AWS_REGION}"
+          fi
 
       - name: Login to Amazon ECR (docker)
+        uses: aws-actions/amazon-ecr-login@v1
+
+      - name: Build and tag Docker images
         run: |
-          aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | docker login --username AWS --password-stdin ${{ secrets.ECR_REGISTRY }}
+          set -euo pipefail
+          FULL_IMAGE_LATEST="${ECR_REGISTRY}/${ECR_REPOSITORY}:latest"
+          FULL_IMAGE_TAG="${ECR_REGISTRY}/${ECR_REPOSITORY}:${IMAGE_TAG}"
 
-      - name: Build Docker image
+          # build both tags
+          docker build -t "${FULL_IMAGE_LATEST}" -t "${FULL_IMAGE_TAG}" .
+
+      - name: Push images to ECR
         run: |
-          docker build -t ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:latest .
+          set -euo pipefail
+          FULL_IMAGE_LATEST="${ECR_REGISTRY}/${ECR_REPOSITORY}:latest"
+          FULL_IMAGE_TAG="${ECR_REGISTRY}/${ECR_REPOSITORY}:${IMAGE_TAG}"
 
-      - name: Run Docker image from ECR
+          docker push "${FULL_IMAGE_TAG}"
+          docker push "${FULL_IMAGE_LATEST}"
+
+      - name: Deploy container (stop/remove, pull, run)
         run: |
-          # Generate a unique tag using GitHub run number
-          IMAGE_TAG=${{ github.run_number }}
+          set -euo pipefail
+          FULL_IMAGE_TAG="${ECR_REGISTRY}/${ECR_REPOSITORY}:${IMAGE_TAG}"
 
-          # Remove existing container if it exists
-          docker rm -f mahesh-it-app || true
+          # Stop and remove existing container if present
+          if docker ps -a --format '{{.Names}}' | grep -q "^${CONTAINER_NAME}$"; then
+            docker stop "${CONTAINER_NAME}" || true
+            docker rm "${CONTAINER_NAME}" || true
+          fi
 
-          # Remove existing image if it exists
-          docker rmi -f ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:$IMAGE_TAG || true
-
-          # Build and tag the image with the serial number
-          docker build -t ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:$IMAGE_TAG .
-
-          # Push the image with the serial number tag
-          docker push ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:$IMAGE_TAG
-
-          # Pull the latest image with the serial number tag
-          docker pull ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:$IMAGE_TAG
-
-          # Run the new container
-          docker run -d --name mahesh-it-app -p 80:80 ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:$IMAGE_TAG
+          # Pull and run the new image
+          docker pull "${FULL_IMAGE_TAG}"
+          docker run -d --name "${CONTAINER_NAME}" -p 80:80 --restart unless-stopped "${FULL_IMAGE_TAG}"
