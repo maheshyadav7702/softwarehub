@@ -6,7 +6,8 @@ const AboutUsPage = () => (
     <Container maxWidth="md" sx={{ py: 6 }}>
         <Box>
             <Typography variant="h3" component="h1" fontWeight="bold" gutterBottom>
-                About Us
+                About Us mahesh
+                
             </Typography>
             <Typography variant="body1" paragraph>
                 Welcome to SoftwareHub! We are passionate about building innovative software solutions that empower businesses and individuals to achieve more.
