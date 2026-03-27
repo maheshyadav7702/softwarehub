@@ -130,6 +130,7 @@ const LoginPage = ()=> {
                 mb: 4,
             }}
         >
+            <Typography>Good morning every one</Typography>
             <Typography variant="h5" align="center" gutterBottom>
                 {formType === 'login' && 'Login'}
                 {formType === 'signup' && 'Sign Up'}

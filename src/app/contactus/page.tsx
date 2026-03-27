@@ -24,7 +24,7 @@ const ContactUsPage = () => {
     return (
         <Box maxWidth={600} mx="auto" py={6} px={2}>
             <Typography variant="h4" fontWeight="bold" mb={4}>
-                Contact Us
+                Contact Us any time
             </Typography>
             {submitted ? (
                 <Alert severity="success">
