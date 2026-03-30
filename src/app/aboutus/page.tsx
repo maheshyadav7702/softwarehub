@@ -10,7 +10,7 @@ const AboutUsPage = () => (
                 
             </Typography>
             <Typography variant="body1" paragraph>
-                Welcome to SoftwareHub! We are passionate about building innovative software solutions that empower businesses and individuals to achieve more.
+                Welcome to SoftwareHub! 
             </Typography>
             <Typography variant="body1" paragraph>
                 Our team consists of experienced developers, designers, and strategists dedicated to delivering high-quality products and exceptional customer service.
