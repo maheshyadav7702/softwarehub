@@ -1,49 +1,70 @@
-name: Deploy to AWS ECR and push Docker image
+name: App Deployment
 
 on:
   push:
     branches:
       - main
 
+env:
+  AWS_REGION: ap-south-2
+  IMAGE_TAG: ${{ github.sha }}
+
+permissions:
+  contents: read
+  packages: write
+
 jobs:
-  push-to-ecr:
-    runs-on: self-hosted
+  deploy:
+    name: Deploy
+    runs-on: [self-hosted, hub-app]
 
     steps:
-      - name: Checkout code
+      - name: Checkout source code
         uses: actions/checkout@v4
-
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.AWS_REGION }}
+          fetch-depth: 0
 
-      - name: Login to Amazon ECR
+      - name: Get secrets from AWS Secrets Manager
+        id: get_secrets
         run: |
-          aws --version
-          aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | docker login --username AWS --password-stdin ${{ secrets.ECR_REGISTRY }}
+          SECRET_JSON=$(aws secretsmanager get-secret-value \
+            --secret-id aws_ecr_repo \
+            --region ap-south-2 \
+            --query SecretString \
+            --output text)
 
-      - name: Set image tag
-        run: echo "IMAGE_TAG=${GITHUB_RUN_NUMBER}" >> $GITHUB_ENV
+          # Mask the entire secret to avoid leaks
+          echo "::add-mask::$SECRET_JSON"
 
-      - name: Build Docker image
+          echo "$SECRET_JSON" > secret.json
+
+          # Extract and mask individual secret
+          APP_ECR_REGISTRY=$(jq -r '.AWS_ECR_REPO' secret.json)
+
+          echo "::add-mask::$APP_ECR_REGISTRY"
+
+          echo "APP_ECR_REGISTRY=$APP_ECR_REGISTRY" >> $GITHUB_ENV
+
+      - name: Build, tag, and push image to Amazon ECR
+        id: build-image
         run: |
-          docker build -t ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:$IMAGE_TAG .
+          docker build \
+            -t $APP_ECR_REGISTRY:hub-app-$IMAGE_TAG \
+            -f Dockerfile . \
+            --no-cache
 
-      - name: Push Docker image to ECR
-        run: |
-          docker push ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:$IMAGE_TAG
+          aws ecr get-login-password --region ap-south-2 | \
+            docker login --username AWS --password-stdin $APP_ECR_REGISTRY
 
-      - name: Verify pushed image (pull)
-        run: |
-          docker pull ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:$IMAGE_TAG
+          echo "image=$APP_ECR_REGISTRY:hub-app-$IMAGE_TAG" >> $GITHUB_OUTPUT
 
-      - name: Remove existing container if present
-        run: |
-          docker rm -f mahesh-it-app || true
+          docker push $APP_ECR_REGISTRY:hub-app-$IMAGE_TAG
 
-      - name: Run new container
+      - name: Deploying to QA-mimicry
         run: |
-          docker run -d --name mahesh-it-app -p 80:3000 ${{ secrets.ECR_REGISTRY }}/${{ secrets.ECR_REPOSITORY }}:$IMAGE_TAG
+          # docker rm -f $(docker ps -aqf "name=hub-app-container") || true
+
+          docker run -d \
+            -p 3000:3000 \
+            --name hub-app-container \
+            "$APP_ECR_REGISTRY:hub-app-$IMAGE_TAG"
