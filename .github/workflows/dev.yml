@@ -62,8 +62,7 @@ jobs:
 
       - name: Deploying to QA-mimicry
         run: |
-          # docker rm -f $(docker ps -aqf "name=hub-app-container") || true
-
+          docker rm -f $(docker ps -aqf "name=hub-app-container") || true
           docker run -d \
             -p 3000:3000 \
             --name hub-app-container \
