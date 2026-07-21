@@ -16,7 +16,7 @@ permissions:
 jobs:
   deploy:
     name: Deploy
-    runs-on: [self-hosted, hub-app]
+    runs-on: ["self-hosted", "hub-app"]
 
     steps:
       - name: Checkout source code
