@@ -65,7 +65,7 @@ const ContactUsPage = () => {
                         color="primary"
                         sx={{ alignSelf: "flex-start" }}
                     >
-                        Send Message
+                        Send Message to me boss
                     </Button>
                 </Box>
             )}
