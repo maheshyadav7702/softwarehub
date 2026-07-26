@@ -12,6 +12,7 @@ import {
 } from '@mui/material';
 import axios from 'axios';
 import { useRouter } from 'next/navigation';
+import { loginService } from '../services/login';
 
 const validateEmail = (email: string) =>
     /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
@@ -75,10 +76,12 @@ const LoginPage = ()=> {
                 try {
                     if (formType === 'signup') {
                         // Signup API
-                        const res = await axios.post(
-                            `${process.env.NEXT_PUBLIC_API_URL}/user/signup`,
-                            { email, password, confirmPassword }
-                        );
+                        // const res = await axios.post(
+                        //     `${process.env.NEXT_PUBLIC_API_URL}/user/signup`,
+                        //     { email, password, confirmPassword }
+                        // );
+
+                        const res = await loginService.login(email, password);
                         if (res) {
                             // Optionally, auto-login or show success message
                             setFormType('login');
@@ -86,13 +89,10 @@ const LoginPage = ()=> {
                         }
                     } else if (formType === 'login') {
                         // Login API
-                        const res = await axios.post(
-                            `${process.env.NEXT_PUBLIC_API_URL}/user/login`,
-                            { email, password }
-                        );
+                      const res = await loginService.login(email, password);
                         if (res) {
                             // Save token if needed: localStorage.setItem('token', res.data.token)
-                            router.push('/');
+                            router.push('/dashboard');
                         }
                     } else if (formType === 'forgot') {
                         // Forgot password API
@@ -130,7 +130,6 @@ const LoginPage = ()=> {
                 mb: 4,
             }}
         >
-            <Typography>Good morning  one</Typography>
             <Typography variant="h5" align="center" gutterBottom>
                 {formType === 'login' && 'Login'}
                 {formType === 'signup' && 'Sign Up'}
