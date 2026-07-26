@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import axios from 'axios'
 import {
   Box,
   Button,
@@ -14,10 +13,7 @@ import {
   TextField,
   Switch,
 } from '@mui/material'
-import axiosInstance from '../services/axiosInstance'
 import { fetchCategories } from '../services/categoryService'
-
-const API = 'http://localhost:8000/api/v1/categories'
 
 export default function Categories() {
   const [categories, setCategories] = useState([])
@@ -35,15 +31,14 @@ export default function Categories() {
 
   const loadCategories = async () => {
     const res = await fetchCategories.getCategories()  
-    console.log('Categories:', res)
     setCategories(res)
   }
 
   const handleSave = async () => {
     if (editingId) {
-      await axiosInstance.put(`${API}/${editingId}`, form)
+      await fetchCategories.putCategory(editingId, form)
     } else {
-      await axiosInstance.post(API, form)
+      await fetchCategories.postCategory(form)
     }
 
     setForm({
@@ -68,7 +63,7 @@ export default function Categories() {
   const handleDelete = async (id: number) => {
     if (!confirm('Delete this category?')) return
 
-    await axios.delete(`${API}/${id}`)
+    await fetchCategories.deleteCategory(id)
     loadCategories()
   }
 
