@@ -31,7 +31,7 @@ export default function Categories() {
 
   const loadCategories = async () => {
     const res = await fetchCategories.getCategories()  
-    setCategories(res)
+    setCategories(res?.data || [])
   }
 
   const handleSave = async () => {
