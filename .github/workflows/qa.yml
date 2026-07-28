@@ -68,7 +68,7 @@ jobs:
 
           docker push $APP_ECR_REGISTRY:hub-app-$IMAGE_TAG
 
-      - name: Deploying to QA-mimicry
+      - name: Deploying to Dev
         run: |
           docker rm -f $(docker ps -aqf "name=hub-app-container") || true
           docker run -d \

@@ -52,11 +52,11 @@ export default function Categories() {
   }
 
   const handleEdit = (item: { id: number; name: string; description: string; is_active: boolean }) => {
-    setEditingId(item.id)
+    setEditingId(item?.id)
     setForm({
-      name: item.name,
-      description: item.description,
-      is_active: item.is_active,
+      name: item?.name,
+      description: item?.description,
+      is_active: item?.is_active,
     })
   }
 
@@ -75,7 +75,7 @@ export default function Categories() {
         fullWidth
         margin="normal"
         label="Name"
-        value={form.name}
+        value={form?.name}
         onChange={(e) =>
           setForm({ ...form, name: e.target.value })
         }
@@ -85,7 +85,7 @@ export default function Categories() {
         fullWidth
         margin="normal"
         label="Description"
-        value={form.description}
+        value={form?.description}
         onChange={(e) =>
           setForm({
             ...form,
@@ -97,7 +97,7 @@ export default function Categories() {
       <Box display="flex" alignItems="center" mb={2}>
         Active
         <Switch
-          checked={form.is_active}
+          checked={form?.is_active}
           onChange={(e) =>
             setForm({
               ...form,
@@ -119,18 +119,17 @@ export default function Categories() {
               <TableCell>Name</TableCell>
               <TableCell>Description</TableCell>
               <TableCell>Status</TableCell>
-              <TableCell>Created</TableCell>
             </TableRow>
           </TableHead>
 
           <TableBody>
-            {categories?.map((item: { id: number; name: string; description: string; is_active: boolean }) => (
+            {categories?.length > 0 && categories?.map((item: { id: number; name: string; description: string; is_active: boolean }) => (
               <TableRow key={item.id}>
-                <TableCell>{item.id}</TableCell>
-                <TableCell>{item.name}</TableCell>
-                <TableCell>{item.description}</TableCell>
+                <TableCell>{item?.id}</TableCell>
+                <TableCell>{item?.name}</TableCell>
+                <TableCell>{item?.description}</TableCell>
                 <TableCell>
-                  {item.is_active ? 'Active' : 'Inactive'}
+                  {item?.is_active ? 'Active' : 'Inactive'}
                 </TableCell>
          
 
@@ -145,7 +144,7 @@ export default function Categories() {
                   <Button
                     color="error"
                     size="small"
-                    onClick={() => handleDelete(item.id)}
+                    onClick={() => handleDelete(item?.id)}
                   >
                     Delete
                   </Button>
