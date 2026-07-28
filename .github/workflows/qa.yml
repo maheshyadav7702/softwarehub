@@ -3,7 +3,7 @@ name: App Deployment
 on:
   push:
     branches:
-      - main
+      - main-pre
 
 env:
   AWS_REGION: ap-south-2
