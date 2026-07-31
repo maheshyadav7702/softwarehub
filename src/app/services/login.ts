@@ -6,3 +6,10 @@ export const loginService = {
         return response.data
     }
 }
+
+export const registerService = {
+    register: async (userData: { first_name: string; last_name: string; email: string; password: string }) => {
+        const response = await axiosInstance.post('auth/register', userData)
+        return response.data
+    }
+}

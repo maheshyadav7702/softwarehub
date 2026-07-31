@@ -207,7 +207,7 @@ const LoginPage = ()=> {
                                 onClick={() => handleFormTypeChange('signup')}
                                 underline="none"
                             >
-                                Sign Up
+                                Sign Up for free
                             </Link>
                         </Typography>
                         <Typography variant="body2" mt={1}>
