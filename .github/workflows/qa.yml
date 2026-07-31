@@ -3,7 +3,7 @@ name: App Deployment
 on:
   push:
     branches:
-      - main_pre_branch
+      - main
 
 env:
   AWS_REGION: ap-south-2
@@ -33,25 +33,27 @@ jobs:
             --query SecretString \
             --output text)
 
-          # Mask the entire secret to avoid leaks
+          # Mask the entire secret
           echo "::add-mask::$SECRET_JSON"
 
           echo "$SECRET_JSON" > secret.json
 
-          # Extract and mask individual secret
+          # Extract values
           APP_ECR_REGISTRY=$(jq -r '.AWS_ECR_REPO' secret.json)
           NEXT_PUBLIC_API_URL=$(jq -r '.NEXT_PUBLIC_API_URL' secret.json)
           NEXT_PUBLIC_APP_NAME=$(jq -r '.NEXT_PUBLIC_APP_NAME' secret.json)
 
+          # Mask individual values
           echo "::add-mask::$APP_ECR_REGISTRY"
           echo "::add-mask::$NEXT_PUBLIC_API_URL"
           echo "::add-mask::$NEXT_PUBLIC_APP_NAME"
 
+          # Export as GitHub Environment Variables
           echo "APP_ECR_REGISTRY=$APP_ECR_REGISTRY" >> $GITHUB_ENV
           echo "NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL" >> $GITHUB_ENV
           echo "NEXT_PUBLIC_APP_NAME=$NEXT_PUBLIC_APP_NAME" >> $GITHUB_ENV
 
-      - name: Build, tag, and push image to Amazon ECR
+      - name: Build, Tag and Push Docker Image
         id: build-image
         run: |
           docker build \
@@ -61,17 +63,32 @@ jobs:
             -f Dockerfile . \
             --no-cache
 
-          aws ecr get-login-password --region ap-south-2 | \
+          aws ecr get-login-password --region $AWS_REGION | \
             docker login --username AWS --password-stdin $APP_ECR_REGISTRY
-
-          echo "image=$APP_ECR_REGISTRY:hub-app-$IMAGE_TAG" >> $GITHUB_OUTPUT
 
           docker push $APP_ECR_REGISTRY:hub-app-$IMAGE_TAG
 
-      - name: Deploying to Dev
+          echo "image=$APP_ECR_REGISTRY:hub-app-$IMAGE_TAG" >> $GITHUB_OUTPUT
+
+      - name: Download Current ECS Task Definition
         run: |
-          docker rm -f $(docker ps -aqf "name=hub-app-container") || true
-          docker run -d \
-            -p 3000:3000 \
-            --name hub-app-container \
-            "$APP_ECR_REGISTRY:hub-app-$IMAGE_TAG"
+          aws ecs describe-task-definition \
+            --task-definition app-task-def \
+            --query taskDefinition \
+            > task-definition.json
+
+      - name: Update Task Definition with New Image
+        id: task-def
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: task-definition.json
+          container-name: hub-app-container
+          image: ${{ steps.build-image.outputs.image }}
+
+      - name: Deploy to Amazon ECS
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v2
+        with:
+          task-definition: ${{ steps.task-def.outputs.task-definition }}
+          cluster: prod-cluster
+          service: app-service
+          wait-for-service-stability: true
