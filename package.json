@@ -10,6 +10,9 @@
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
+    "@datadog/browser-logs": "^7.7.0",
+    "@datadog/browser-rum": "^7.7.0",
+    "@datadog/browser-rum-nextjs": "^7.7.0",
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.1",
     "@hookform/resolvers": "^5.5.7",
