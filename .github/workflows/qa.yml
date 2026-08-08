@@ -89,6 +89,6 @@ jobs:
         uses: aws-actions/amazon-ecs-deploy-task-definition@v2
         with:
           task-definition: ${{ steps.task-def.outputs.task-definition }}
-          cluster: prod-cluster
+          cluster: maheshit-cluster
           service: app-service
           wait-for-service-stability: true
